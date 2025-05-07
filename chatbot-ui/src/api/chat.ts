@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: 'http://localhost:8080/api', // 替换为您的SpringBoot后端地址
+  baseURL: 'http://localhost:8082/ai', // 替换为您的SpringBoot后端地址
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json'

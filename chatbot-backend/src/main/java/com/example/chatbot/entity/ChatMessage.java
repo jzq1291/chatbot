@@ -1,22 +1,31 @@
 package com.example.chatbot.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
+import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("chat_messages")
+@Entity
+@Table(name = "chat_messages")
 public class ChatMessage {
-    @TableId(type = IdType.AUTO)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @TableField("session_id")
-    private Long sessionId;
-
-    private String role;
-
+    @Column(columnDefinition = "text")
     private String content;
 
-    @TableField(fill = FieldFill.INSERT)
+    @Column(nullable = false)
+    private String role; // "user" or "assistant"
+
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "session_id")
+    private String sessionId;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+    }
 } 
