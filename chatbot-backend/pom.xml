@@ -11,8 +11,8 @@
     <groupId>com.example</groupId>
     <artifactId>chatbot-backend</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>chatbot-backend-new</name>
-    <description>chatbot-backend-new</description>
+    <name>chatbot-backend</name>
+    <description>chatbot-backend</description>
     <url/>
     <licenses>
         <license/>

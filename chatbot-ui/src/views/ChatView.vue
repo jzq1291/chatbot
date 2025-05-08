@@ -61,6 +61,7 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick, computed } from 'vue'
 import { Plus, Delete } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { useChatStore } from '../store/chat'
 import { chatApi } from '../api/chat'
 import type { Message } from '../store/chat'
@@ -80,8 +81,26 @@ const createNewChat = () => {
 }
 
 // 选择会话
-const selectSession = (sessionId: string) => {
+const selectSession = async (sessionId: string) => {
   store.setCurrentSession(sessionId)
+  try {
+    const history = await chatApi.getHistory(sessionId)
+    // 清空当前会话的消息
+    const session = store.sessions.find(s => s.id === sessionId)
+    if (session) {
+      session.messages = []
+      // 将历史消息添加到会话中
+      history.forEach((item: any) => {
+        store.addMessage(sessionId, {
+          role: item.role || 'assistant',
+          content: item.message
+        })
+      })
+    }
+  } catch (error) {
+    console.error('Error loading chat history:', error)
+    ElMessage.error('Failed to load chat history')
+  }
 }
 
 // 删除会话
@@ -131,9 +150,26 @@ const scrollToBottom = async () => {
 }
 
 // 初始化
-onMounted(() => {
-  if (sessions.value.length === 0) {
-    createNewChat()
+onMounted(async () => {
+  try {
+    const sessionIds = await chatApi.getAllSessions()
+    if (sessionIds.length > 0) {
+      // 加载所有会话
+      for (const sessionId of sessionIds) {
+        const session = store.sessions.find(s => s.id === sessionId)
+        if (!session) {
+          store.createNewSession(sessionId)
+        }
+      }
+      // 选择第一个会话
+      selectSession(sessionIds[0])
+    } else {
+      store.createNewSession()
+    }
+  } catch (error) {
+    console.error('Error loading sessions:', error)
+    ElMessage.error('Failed to load sessions')
+    store.createNewSession()
   }
 })
 </script>

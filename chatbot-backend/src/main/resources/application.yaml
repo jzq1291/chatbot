@@ -3,9 +3,9 @@ server:
 
 spring:
   application:
-    name: chatbot-backend-new
+    name: chatbot-backend
   datasource:
-    url: jdbc:postgresql://localhost:5433/chatbot?currentSchema=chatbot
+    url: jdbc:postgresql://localhost:5432/chatbot?currentSchema=chatbot
     username: postgres
     password: 123456
     driver-class-name: org.postgresql.Driver

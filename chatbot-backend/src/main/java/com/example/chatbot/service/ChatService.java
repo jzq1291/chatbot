@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 import java.util.UUID;
@@ -65,7 +66,12 @@ public class ChatService {
                 .map(msg -> ChatResponse.builder()
                         .message(msg.getContent())
                         .sessionId(msg.getSessionId())
+                        .role(msg.getRole())
                         .build())
                 .collect(Collectors.toList());
+    }
+
+    public List<String> getAllSessions() {
+        return chatMessageRepository.findDistinctSessionIdBy();
     }
 } 

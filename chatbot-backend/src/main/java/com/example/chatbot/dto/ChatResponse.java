@@ -8,4 +8,5 @@ import lombok.Builder;
 public class ChatResponse {
     private String message;
     private String sessionId;
+    private String role;
 } 

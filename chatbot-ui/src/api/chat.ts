@@ -16,6 +16,7 @@ export interface ChatRequest {
 export interface ChatResponse {
   message: string
   sessionId: string
+  role: string
 }
 
 export const chatApi = {
@@ -26,6 +27,11 @@ export const chatApi = {
 
   getHistory: async (sessionId: string) => {
     const response = await api.get(`/chat/history/${sessionId}`)
+    return response.data
+  },
+
+  getAllSessions: async () => {
+    const response = await api.get<string[]>('/chat/sessions')
     return response.data
   }
 } 

@@ -26,9 +26,9 @@ export const useChatStore = defineStore('chat', {
   },
 
   actions: {
-    createNewSession() {
+    createNewSession(sessionId?: string) {
       const newSession: ChatSession = {
-        id: Date.now().toString(),
+        id: sessionId || Date.now().toString(),
         title: 'New Chat',
         messages: [],
         lastUpdated: Date.now()
