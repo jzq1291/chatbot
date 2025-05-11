@@ -4,8 +4,10 @@ import com.example.chatbot.dto.ChatRequest;
 import com.example.chatbot.dto.ChatResponse;
 import com.example.chatbot.service.ChatService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
@@ -20,13 +22,13 @@ public class ChatController {
         ChatResponse response = chatService.processMessage(request);
         return ResponseEntity.ok(response);
     }
-//    @PostMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-//    public ResponseEntity<Flux<ChatResponse>> chatStream(@RequestBody ChatRequest request) {
-//        Flux<ChatResponse> responseFlux = chatService.processMessageStream(request);
-//        return ResponseEntity.ok()
-//                .contentType(MediaType.TEXT_EVENT_STREAM)
-//                .body(responseFlux);
-//    }
+
+    @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamChat(@RequestBody ChatRequest request) {
+        SseEmitter emitter = new SseEmitter();
+        chatService.processMessageStream(request.getSessionId(), request.getMessage(), emitter);
+        return emitter;
+    }
 
     @GetMapping("/history/{sessionId}")
     public ResponseEntity<List<ChatResponse>> getHistory(@PathVariable String sessionId) {
@@ -38,5 +40,11 @@ public class ChatController {
     public ResponseEntity<List<String>> getAllSessions() {
         List<String> sessions = chatService.getAllSessions();
         return ResponseEntity.ok(sessions);
+    }
+
+    @DeleteMapping("/session/{sessionId}")
+    public ResponseEntity<Void> deleteSession(@PathVariable String sessionId) {
+        chatService.deleteSession(sessionId);
+        return ResponseEntity.noContent().build();
     }
 }

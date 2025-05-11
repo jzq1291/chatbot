@@ -1,8 +1,8 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: 'http://localhost:8082/ai', // 替换为您的SpringBoot后端地址
-  timeout: 30000,
+  baseURL: 'http://localhost:8082/ai', // 后端 API 地址
+  timeout: 300000, // 超时时间
   headers: {
     'Content-Type': 'application/json'
   }
@@ -32,6 +32,11 @@ export const chatApi = {
 
   getAllSessions: async () => {
     const response = await api.get<string[]>('/chat/sessions')
+    return response.data
+  },
+
+  deleteSession: async (sessionId: string) => {
+    const response = await api.delete(`/chat/session/${sessionId}`)
     return response.data
   }
 } 

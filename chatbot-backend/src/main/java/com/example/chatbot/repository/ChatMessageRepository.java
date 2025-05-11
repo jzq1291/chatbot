@@ -10,6 +10,11 @@ import java.util.List;
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
     List<ChatMessage> findBySessionIdOrderByCreatedAtAsc(String sessionId);
     
+    @Query("SELECT m FROM ChatMessage m WHERE m.sessionId = :sessionId ORDER BY m.createdAt DESC LIMIT 10")
+    List<ChatMessage> findLast10BySessionIdOrderByCreatedAtDesc(String sessionId);
+
     @Query("SELECT DISTINCT c.sessionId FROM ChatMessage c")
     List<String> findDistinctSessionIdBy();
+
+    void deleteBySessionId(String sessionId);
 } 
