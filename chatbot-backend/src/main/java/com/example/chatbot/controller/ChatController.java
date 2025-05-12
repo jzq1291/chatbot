@@ -19,15 +19,26 @@ public class ChatController {
 
     @PostMapping
     public ResponseEntity<ChatResponse> chat(@RequestBody ChatRequest request) {
+        if (request.getModelId() == null) {
+            request.setModelId("qwen3");
+        }
         ChatResponse response = chatService.processMessage(request);
         return ResponseEntity.ok(response);
     }
 
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamChat(@RequestBody ChatRequest request) {
+        if (request.getModelId() == null) {
+            request.setModelId("qwen3");
+        }
         SseEmitter emitter = new SseEmitter();
-        chatService.processMessageStream(request.getSessionId(), request.getMessage(), emitter);
+        chatService.processMessageStream(request.getSessionId(), request.getMessage(), request.getModelId(), emitter);
         return emitter;
+    }
+
+    @GetMapping("/models")
+    public ResponseEntity<List<String>> getAvailableModels() {
+        return ResponseEntity.ok(List.of("qwen3", "deepseekR1"));
     }
 
     @GetMapping("/history/{sessionId}")

@@ -5,9 +5,9 @@
       <!-- 新建聊天按钮区域 -->
       <div class="new-chat">
         <div class="logo">
-          <span class="logo-text">AI Bot</span>
+          <span class="logo-text" style="font-size: 0.9em;">AiBot</span>
         </div>
-        <el-button type="primary" class="new-chat-btn" @click="createNewChat">
+        <el-button type="primary" class="new-chat-btn" size="small" @click="createNewChat">
           <el-icon><Plus /></el-icon>
           New Chat
         </el-button>
@@ -39,6 +39,22 @@
 
     <!-- 主聊天区域：包含消息列表和输入框 -->
     <div class="main-chat">
+      <!-- 模型选择器 -->
+      <div class="model-selector" v-if="currentSession">
+        <el-select
+          v-model="currentSession.selectedModel"
+          placeholder="Select Model"
+          @change="handleModelChange"
+        >
+          <el-option
+            v-for="model in availableModels"
+            :key="model"
+            :label="model"
+            :value="model"
+          />
+        </el-select>
+      </div>
+
       <!-- 消息列表容器 -->
       <div class="messages" ref="messagesContainer">
         <!-- 遍历当前会话的所有消息 -->
@@ -48,7 +64,12 @@
           :class="['message', message.role]"
         >
           <!-- 显示消息内容 -->
-          <div class="message-content">{{ message.content }}</div>
+          <div class="message-content">
+            {{ message.content }}
+            <div class="message-model" v-if="message.modelId">
+              Model: {{ message.modelId }}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -100,6 +121,8 @@ const sessions = computed(() => store.sessions)
 const currentSessionId = computed(() => store.currentSessionId)
 // 计算属性：获取当前会话
 const currentSession = computed(() => store.currentSession)
+// 计算属性：获取可用的模型列表
+const availableModels = computed(() => store.availableModels)
 
 // 创建新会话的方法
 const createNewChat = () => {
@@ -122,7 +145,8 @@ const selectSession = async (sessionId: string) => {
       history.forEach((item: any) => {
         store.addMessage(sessionId, {
           role: item.role || 'assistant',
-          content: item.message
+          content: item.message,
+          modelId: item.modelId
         })
       })
     }
@@ -143,6 +167,13 @@ const deleteSession = async (sessionId: string) => {
   } catch (error) {
     console.error('Error deleting session:', error)
     ElMessage.error('Failed to delete session')
+  }
+}
+
+// 处理模型变更
+const handleModelChange = (modelId: string) => {
+  if (currentSessionId.value) {
+    store.setSessionModel(currentSessionId.value, modelId)
   }
 }
 
@@ -171,13 +202,15 @@ const sendMessage = async () => {
     // 发送消息到后端
     const response = await chatApi.sendMessage({
       message: message.content,
-      sessionId: currentSessionId.value
+      sessionId: currentSessionId.value,
+      modelId: currentSession.value?.selectedModel
     })
 
     // 添加 AI 响应到会话
     store.addMessage(currentSessionId.value, {
       role: 'assistant',
-      content: response.message
+      content: response.message,
+      modelId: response.modelId
     })
     // 滚动到底部
     await scrollToBottom()
@@ -211,6 +244,10 @@ const scrollToBottom = async () => {
 // 组件挂载时的初始化
 onMounted(async () => {
   try {
+    // 获取可用的模型列表
+    const models = await chatApi.getAvailableModels()
+    store.setAvailableModels(models)
+
     // 获取所有会话
     const sessionIds = await chatApi.getAllSessions()
     if (sessionIds.length > 0) {
@@ -354,6 +391,13 @@ onMounted(async () => {
   padding: 20px;
 }
 
+/* 模型选择器样式 */
+.model-selector {
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+
 /* 消息列表容器样式 */
 .messages {
   flex: 1;
@@ -384,6 +428,13 @@ onMounted(async () => {
   align-self: flex-start;
   background-color: #fff;
   border: 1px solid #e4e7ed;
+}
+
+/* 消息模型标签样式 */
+.message-model {
+  font-size: 0.8em;
+  color: #909399;
+  margin-top: 4px;
 }
 
 /* 输入区域样式 */

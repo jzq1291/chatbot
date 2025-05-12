@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -26,11 +27,19 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ChatService {
     private final ChatMessageRepository chatMessageRepository;
-    private final ChatClient chatClient;
+    private final Map<String, ChatClient> chatClients;
     private final KnowledgeService knowledgeService;
+
     @Transactional
     public ChatResponse processMessage(ChatRequest request) {
         String sessionId = getOrCreateSessionId(request.getSessionId());
+        String modelId = request.getModelId() != null ? request.getModelId() : "qwen3";
+        ChatClient chatClient = chatClients.get(modelId);
+        
+        if (chatClient == null) {
+            throw new IllegalArgumentException("Invalid model ID: " + modelId);
+        }
+
         // 清理用户消息
         String cleanedMessage = cleanMessage(request.getMessage());
         saveUserMessage(cleanedMessage, sessionId);
@@ -73,6 +82,7 @@ public class ChatService {
         return ChatResponse.builder()
                 .message(cleanedResponse)
                 .sessionId(sessionId)
+                .modelId(modelId)
                 .build();
     }
 
@@ -165,13 +175,19 @@ public class ChatService {
                 .replaceAll("\\s+", " "); // 将中间的多个空白字符替换为单个空格
     }
 
-    public void processMessageStream(String sessionId, String message, SseEmitter emitter) {
+    public void processMessageStream(String sessionId, String message, String modelId, SseEmitter emitter) {
         try {
             // 获取或创建会话ID
             String currentSessionId = getOrCreateSessionId(sessionId);
+            String currentModelId = modelId != null ? modelId : "qwen";
+            ChatClient chatClient = chatClients.get(currentModelId);
+            
+            if (chatClient == null) {
+                throw new IllegalArgumentException("Invalid model ID: " + currentModelId);
+            }
 
             // 保存用户消息
-            saveUserMessage(currentSessionId, message);
+            saveUserMessage(message, currentSessionId);
 
             // 构建消息上下文
             List<Message> messages = buildMessageContext(currentSessionId);
@@ -204,7 +220,7 @@ public class ChatService {
             }
 
             // 保存完整的助手回复
-            saveAssistantMessage(currentSessionId, response);
+            saveAssistantMessage(response, currentSessionId);
 
             // 完成流式响应
             emitter.send(SseEmitter.event()

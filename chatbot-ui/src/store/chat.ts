@@ -6,6 +6,7 @@ export interface Message {
   role: 'user' | 'assistant'
   content: string
   timestamp: number
+  modelId?: string
 }
 
 // 定义聊天会话接口
@@ -14,6 +15,7 @@ export interface ChatSession {
   title: string
   messages: Message[]
   lastUpdated: number
+  selectedModel: string
 }
 
 // 创建聊天 store
@@ -22,6 +24,7 @@ export const useChatStore = defineStore('chat', {
   state: () => ({
     sessions: [] as ChatSession[], // 所有会话列表
     currentSessionId: null as string | null, // 当前选中的会话ID
+    availableModels: [] as string[], // 可用的模型列表
   }),
 
   // 定义 getter
@@ -39,7 +42,8 @@ export const useChatStore = defineStore('chat', {
         id: sessionId || Date.now().toString(),
         title: 'New Chat',
         messages: [],
-        lastUpdated: Date.now()
+        lastUpdated: Date.now(),
+        selectedModel: 'qwen3' // 默认使用 qwen3
       }
       this.sessions.push(newSession)
       this.currentSessionId = newSession.id
@@ -52,8 +56,9 @@ export const useChatStore = defineStore('chat', {
       if (session) {
         const newMessage: Message = {
           ...message,
-          id: Date.now().toString(),
-          timestamp: Date.now()
+          id: `${sessionId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: Date.now(),
+          modelId: session.selectedModel
         }
         session.messages.push(newMessage)
         session.lastUpdated = Date.now()
@@ -74,6 +79,19 @@ export const useChatStore = defineStore('chat', {
           this.currentSessionId = this.sessions[0]?.id || null
         }
       }
+    },
+
+    // 设置会话的模型
+    setSessionModel(sessionId: string, modelId: string) {
+      const session = this.sessions.find(s => s.id === sessionId)
+      if (session) {
+        session.selectedModel = modelId
+      }
+    },
+
+    // 设置可用的模型列表
+    setAvailableModels(models: string[]) {
+      this.availableModels = models
     }
   }
 }) 

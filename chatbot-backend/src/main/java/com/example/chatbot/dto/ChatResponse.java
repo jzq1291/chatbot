@@ -9,4 +9,5 @@ public class ChatResponse {
     private String message;
     private String sessionId;
     private String role;
+    private String modelId;
 } 

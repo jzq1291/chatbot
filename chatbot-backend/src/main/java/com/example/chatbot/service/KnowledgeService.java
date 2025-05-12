@@ -42,4 +42,15 @@ public class KnowledgeService {
     public List<KnowledgeBase> findByCategory(String category) {
         return knowledgeBaseRepository.findByCategory(category);
     }
+
+    @Transactional
+    public KnowledgeBase updateKnowledge(Long id, KnowledgeBase knowledge) {
+        KnowledgeBase existing = knowledgeBaseRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("知识不存在"));
+        existing.setTitle(knowledge.getTitle());
+        existing.setContent(knowledge.getContent());
+        existing.setCategory(knowledge.getCategory());
+        // updatedAt 字段由 @PreUpdate 自动处理
+        return knowledgeBaseRepository.save(existing);
+    }
 } 

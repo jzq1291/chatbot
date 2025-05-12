@@ -34,4 +34,9 @@ public class KnowledgeBaseController {
         knowledgeService.deleteKnowledge(id);
         return ResponseEntity.noContent().build();
     }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<KnowledgeBase> updateKnowledge(@PathVariable Long id, @RequestBody KnowledgeBase knowledge) {
+        return ResponseEntity.ok(knowledgeService.updateKnowledge(id, knowledge));
+    }
 } 
