@@ -17,7 +17,7 @@ import java.util.List;
 public class ChatController {
     private final ChatService chatService;
 
-    @PostMapping
+    @PostMapping("/send")
     public ResponseEntity<ChatResponse> chat(@RequestBody ChatRequest request) {
         if (request.getModelId() == null) {
             request.setModelId("qwen3");

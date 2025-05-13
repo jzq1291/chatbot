@@ -1,10 +1,13 @@
 package com.example.chatbot.service;
 
+import com.example.chatbot.config.ModelProperties;
 import com.example.chatbot.dto.ChatRequest;
 import com.example.chatbot.dto.ChatResponse;
 import com.example.chatbot.entity.ChatMessage;
 import com.example.chatbot.entity.KnowledgeBase;
+import com.example.chatbot.entity.User;
 import com.example.chatbot.repository.ChatMessageRepository;
+import com.example.chatbot.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -12,6 +15,8 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -20,7 +25,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -28,22 +32,27 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ChatService {
     private final ChatMessageRepository chatMessageRepository;
-    private final Map<String, ChatClient> chatClients;
+    private final ChatClient chatClient;
     private final KnowledgeService knowledgeService;
+    private final ModelProperties modelProperties;
+    private final UserRepository userRepository;
+
+    private User getCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+    }
 
     @Transactional
     public ChatResponse processMessage(ChatRequest request) {
+        User currentUser = getCurrentUser();
         String sessionId = getOrCreateSessionId(request.getSessionId());
         String modelId = request.getModelId() != null ? request.getModelId() : "qwen3";
-        ChatClient chatClient = chatClients.get(modelId);
         
-        if (chatClient == null) {
-            throw new IllegalArgumentException("Invalid model ID: " + modelId);
-        }
-
         // 清理用户消息
         String cleanedMessage = cleanMessage(request.getMessage());
-        saveUserMessage(cleanedMessage, sessionId);
+        saveUserMessage(cleanedMessage, sessionId, currentUser);
         
         // 搜索相关知识库内容
         List<KnowledgeBase> relevantDocs = knowledgeService.searchByKeyword(cleanedMessage);
@@ -67,11 +76,17 @@ public class ChatService {
             messages.add(new UserMessage(cleanedMessage));
         }
 
+        // 获取模型配置
+        ModelProperties.ModelOption modelOptions = modelProperties.getOptions().get(modelId);
+        if (modelOptions == null) {
+            throw new IllegalArgumentException("Invalid model ID: " + modelId);
+        }
+
         ChatOptions options = ChatOptions.builder()
-                .model("deepseek-r1:7b")
-                .temperature(0.7)
-                .topP(0.95)
-                .topK(50)
+                .model(modelOptions.getModel())
+                .temperature(modelOptions.getTemperature())
+                .topP(modelOptions.getTopP())
+                .topK(modelOptions.getTopK())
                 .build();
 
         // 调用AI模型
@@ -82,10 +97,11 @@ public class ChatService {
                 .content();
 
         // 清理AI响应
+        assert aiResponse != null;
         String cleanedResponse = cleanAiResponse(aiResponse);
 
         // 保存AI响应
-        saveAssistantMessage(cleanedResponse, sessionId);
+        saveAssistantMessage(cleanedResponse, sessionId, currentUser);
 
         return ChatResponse.builder()
                 .message(cleanedResponse)
@@ -101,25 +117,27 @@ public class ChatService {
         return sessionId;
     }
 
-    private void saveUserMessage(String content, String sessionId) {
+    private void saveUserMessage(String content, String sessionId, User user) {
         ChatMessage userMessage = new ChatMessage();
         userMessage.setContent(content);
         userMessage.setRole("user");
         userMessage.setSessionId(sessionId);
+        userMessage.setUser(user);
         chatMessageRepository.save(userMessage);
     }
 
-    private void saveAssistantMessage(String content, String sessionId) {
+    private void saveAssistantMessage(String content, String sessionId, User user) {
         ChatMessage assistantMessage = new ChatMessage();
         assistantMessage.setContent(content);
         assistantMessage.setRole("assistant");
         assistantMessage.setSessionId(sessionId);
+        assistantMessage.setUser(user);
         chatMessageRepository.save(assistantMessage);
     }
 
     private List<Message> buildMessageContext(String sessionId) {
         // 获取最近的10条消息
-        List<ChatMessage> history = chatMessageRepository.findLast10BySessionIdOrderByCreatedAtDesc(sessionId);
+        List<ChatMessage> history = chatMessageRepository.findLast10BySessionIdAndUserOrderByCreatedAtDesc(sessionId, getCurrentUser());
         // 反转列表以保持时间顺序
         Collections.reverse(history);
 
@@ -154,7 +172,8 @@ public class ChatService {
     }
 
     public List<ChatResponse> getHistory(String sessionId) {
-        List<ChatMessage> messages = chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
+        User currentUser = getCurrentUser();
+        List<ChatMessage> messages = chatMessageRepository.findBySessionIdAndUserOrderByCreatedAtAsc(sessionId, currentUser);
         return messages.stream()
                 .map(msg -> ChatResponse.builder()
                         .message(msg.getContent())
@@ -165,12 +184,14 @@ public class ChatService {
     }
 
     public List<String> getAllSessions() {
-        return chatMessageRepository.findDistinctSessionIdBy();
+        User currentUser = getCurrentUser();
+        return chatMessageRepository.findDistinctSessionIdByUser(currentUser);
     }
 
     @Transactional
     public void deleteSession(String sessionId) {
-        chatMessageRepository.deleteBySessionId(sessionId);
+        User currentUser = getCurrentUser();
+        chatMessageRepository.deleteBySessionIdAndUser(sessionId, currentUser);
     }
 
     private String cleanMessage(String message) {
@@ -187,27 +208,37 @@ public class ChatService {
         try {
             // 获取或创建会话ID
             String currentSessionId = getOrCreateSessionId(sessionId);
-            String currentModelId = modelId != null ? modelId : "qwen";
-            ChatClient chatClient = chatClients.get(currentModelId);
-            
-            if (chatClient == null) {
-                throw new IllegalArgumentException("Invalid model ID: " + currentModelId);
-            }
+            String currentModelId = modelId != null ? modelId : "qwen3";
 
             // 保存用户消息
-            saveUserMessage(message, currentSessionId);
+            saveUserMessage(message, currentSessionId, getCurrentUser());
 
             // 构建消息上下文
             List<Message> messages = buildMessageContext(currentSessionId);
 
+            // 获取模型配置
+            ModelProperties.ModelOption modelOptions = modelProperties.getOptions().get(currentModelId);
+            if (modelOptions == null) {
+                throw new IllegalArgumentException("Invalid model ID: " + currentModelId);
+            }
+
+            ChatOptions options = ChatOptions.builder()
+                    .model(modelOptions.getModel())
+                    .temperature(modelOptions.getTemperature())
+                    .topP(modelOptions.getTopP())
+                    .topK(modelOptions.getTopK())
+                    .build();
+
             // 发送流式响应
             String response = chatClient.prompt()
                     .messages(messages)
+                    .options(options)
                     .call()
                     .content();
 
             // 将响应分块发送
             // 每次发送一个字符，模拟流式效果
+            assert response != null;
             for (char c : response.toCharArray()) {
                 try {
                     emitter.send(SseEmitter.event()
@@ -226,7 +257,7 @@ public class ChatService {
             }
 
             // 保存完整的助手回复
-            saveAssistantMessage(response, currentSessionId);
+            saveAssistantMessage(response, currentSessionId, getCurrentUser());
 
             // 完成流式响应
             emitter.send(SseEmitter.event()

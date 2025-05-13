@@ -24,6 +24,10 @@ public class ChatMessage {
     @Column(name = "session_id")
     private String sessionId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

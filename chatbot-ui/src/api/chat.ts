@@ -1,49 +1,45 @@
-import axios from 'axios'
-
-const api = axios.create({
-  baseURL: 'http://localhost:8082/ai/chat', // 添加 /chat
-  timeout: 300000, // 超时时间
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
+import request from '@/utils/request'
 
 export interface ChatRequest {
   message: string
   sessionId: string
-  modelId?: string
+  modelId: string
 }
 
 export interface ChatResponse {
   message: string
-  sessionId: string
-  role: string
   modelId: string
 }
 
+export interface ChatHistoryItem {
+  role: string
+  message: string
+  modelId?: string
+}
+
 export const chatApi = {
-  sendMessage: async (request: ChatRequest): Promise<ChatResponse> => {
-    const response = await api.post<ChatResponse>('', request) // 移除 /chat
-    return response.data
+  // 获取所有会话
+  getAllSessions: () => {
+    return request.get<string[]>('/ai/chat/sessions')
   },
 
-  getHistory: async (sessionId: string) => {
-    const response = await api.get(`/history/${sessionId}`) // 移除 /chat
-    return response.data
+  // 获取会话历史
+  getHistory: (sessionId: string) => {
+    return request.get<ChatHistoryItem[]>(`/ai/chat/history/${sessionId}`)
   },
 
-  getAllSessions: async () => {
-    const response = await api.get<string[]>('/sessions') // 移除 /chat
-    return response.data
+  // 发送消息
+  sendMessage: (data: ChatRequest) => {
+    return request.post<ChatResponse>('/ai/chat/send', data)
   },
 
-  deleteSession: async (sessionId: string) => {
-    const response = await api.delete(`/session/${sessionId}`) // 移除 /chat
-    return response.data
+  // 删除会话
+  deleteSession: (sessionId: string) => {
+    return request.delete(`/ai/chat/sessions/${sessionId}`)
   },
 
-  getAvailableModels: async () => {
-    const response = await api.get<string[]>('/models') // 移除 /chat
-    return response.data
+  // 获取可用模型
+  getAvailableModels: () => {
+    return request.get<string[]>('/ai/chat/models')
   }
 } 
