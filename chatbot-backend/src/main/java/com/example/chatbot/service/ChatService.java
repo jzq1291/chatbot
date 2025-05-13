@@ -11,6 +11,7 @@ import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -56,15 +57,22 @@ public class ChatService {
         } else {
             messages.add(new UserMessage(cleanedMessage));
         }
-        
+
+        ChatOptions options = ChatOptions.builder()
+                .model("deepseek-r1:7b")
+                .temperature(0.7)
+                .topP(0.95)
+                .topK(50)
+                .build();
+
         // 调用AI模型
         String aiResponse = chatClient.prompt()
                 .messages(messages)
+                .options(options)
                 .call()
                 .content();
 
         // 清理AI响应
-        assert aiResponse != null;
         String cleanedResponse = cleanAiResponse(aiResponse);
 
         // 保存AI响应
@@ -183,22 +191,20 @@ public class ChatService {
                     .content();
 
             // 将响应分块发送
-            if (response != null) {
-                // 每次发送一个字符，模拟流式效果
-                for (char c : response.toCharArray()) {
+            // 每次发送一个字符，模拟流式效果
+            for (char c : response.toCharArray()) {
+                try {
+                    emitter.send(SseEmitter.event()
+                            .name("message")
+                            .data(String.valueOf(c)));
+                    Thread.sleep(10); // 添加小延迟使流式效果更明显
+                } catch (IOException | InterruptedException e) {
                     try {
                         emitter.send(SseEmitter.event()
-                                .name("message")
-                                .data(String.valueOf(c)));
-                        Thread.sleep(10); // 添加小延迟使流式效果更明显
-                    } catch (IOException | InterruptedException e) {
-                        try {
-                            emitter.send(SseEmitter.event()
-                                    .name("error")
-                                    .data(e.getMessage()));
-                        } catch (IOException ex) {
-                            // 忽略发送错误消息时的异常
-                        }
+                                .name("error")
+                                .data(e.getMessage()));
+                    } catch (IOException ex) {
+                        // 忽略发送错误消息时的异常
                     }
                 }
             }
