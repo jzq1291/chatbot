@@ -52,15 +52,23 @@ export const useChatStore = defineStore('chat', () => {
   const loadSessions = async () => {
     try {
       const response = await chatApi.getAllSessions()
-      sessions.value = response
+      // 合并后端返回的会话和前端未发送消息的会话
+      const backendSessions = new Set(response)
+      const frontendSessions = sessions.value.filter(id => !backendSessions.has(id))
+      sessions.value = [...frontendSessions, ...response]
+      
       if (sessions.value.length > 0) {
         currentSessionId.value = sessions.value[0]
-        // 加载第一个会话的历史记录
-        const history = await chatApi.getHistory(sessions.value[0])
-        messages.value = history.map((item: any) => ({
-          role: item.role || 'assistant',
-          content: item.message
-        }))
+        // 只加载后端存在的会话的历史记录
+        if (backendSessions.has(currentSessionId.value)) {
+          const history = await chatApi.getHistory(currentSessionId.value)
+          messages.value = history.map((item: any) => ({
+            role: item.role || 'assistant',
+            content: item.message
+          }))
+        } else {
+          messages.value = []
+        }
       }
     } catch (error) {
       console.error('Failed to load sessions:', error)
@@ -88,7 +96,8 @@ export const useChatStore = defineStore('chat', () => {
   // 创建新会话
   const createNewChat = async () => {
     try {
-      const newSessionId = await chatApi.createSession()
+      // 在前端生成新的会话ID
+      const newSessionId = crypto.randomUUID()
       sessions.value.unshift(newSessionId)
       currentSessionId.value = newSessionId
       messages.value = []
@@ -107,7 +116,7 @@ export const useChatStore = defineStore('chat', () => {
         if (sessions.value.length > 0) {
           await switchSession(sessions.value[0])
         } else {
-          createNewChat()
+          await createNewChat()
         }
       }
     } catch (error) {

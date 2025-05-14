@@ -44,8 +44,8 @@
         <el-form-item label="邮箱" prop="email">
           <el-input v-model="newUser.email" />
         </el-form-item>
-        <el-form-item label="密码" prop="password">
-          <el-input v-model="newUser.password" type="password" />
+        <el-form-item label="密码" prop="password" :rules="isEditMode ? editPasswordRules : rules.password" :required="!isEditMode">
+          <el-input v-model="newUser.password" type="password" :placeholder="isEditMode ? '不修改请留空' : '请输入密码'" />
         </el-form-item>
         <el-form-item label="角色" prop="roles">
           <el-select v-model="newUser.roles" multiple style="width: 100%">
@@ -82,7 +82,6 @@ const isEditMode = ref(false)
 
 const formRef = ref<FormInstance>()
 const newUser = ref<User>({
-  id: 0,
   username: '',
   email: '',
   password: '',
@@ -107,10 +106,22 @@ const rules = ref<FormRules>({
   ]
 })
 
+const editPasswordRules = [
+  { 
+    validator: (rule: any, value: string, callback: any) => {
+      if (value && (value.length < 6 || value.length > 20)) {
+        callback(new Error('长度在 6 到 20 个字符'))
+      } else {
+        callback()
+      }
+    },
+    trigger: 'blur'
+  }
+]
+
 const showAddDialog = () => {
   isEditMode.value = false
   newUser.value = {
-    id: 0,
     username: '',
     email: '',
     password: '',
@@ -121,7 +132,10 @@ const showAddDialog = () => {
 
 const showEditDialog = (row: User) => {
   isEditMode.value = true
-  newUser.value = { ...row }
+  newUser.value = { 
+    ...row,
+    password: '' // 清空密码字段
+  }
   dialogVisible.value = true
 }
 
@@ -131,11 +145,17 @@ const handleSave = async () => {
   await formRef.value.validate(async (valid) => {
     if (valid) {
       try {
+        const userToSave = { ...newUser.value }
+        // 如果是编辑模式且密码为空，则删除密码字段
+        if (isEditMode.value && !userToSave.password) {
+          delete userToSave.password
+        }
+        
         if (isEditMode.value) {
-          await userStore.updateUser(newUser.value)
+          await userStore.updateUser(userToSave)
           ElMessage.success('更新成功')
         } else {
-          await userStore.createUser(newUser.value)
+          await userStore.createUser(userToSave)
           ElMessage.success('创建成功')
         }
         dialogVisible.value = false

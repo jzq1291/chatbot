@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { ChatDotRound, Collection, Fold, Expand, User } from '@element-plus/icons-vue'
 
 const isCollapse = ref(true)
 </script>

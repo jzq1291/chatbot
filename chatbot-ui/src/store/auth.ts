@@ -59,7 +59,7 @@ export const useAuthStore = defineStore('auth', () => {
       setToken(newToken)
       setUsername(newUsername)
       setRoles(newRoles as UserRole[])
-      router.push('/chat')
+      await router.push('/chat')
       return response
     } finally {
       loading.value = false
@@ -74,7 +74,7 @@ export const useAuthStore = defineStore('auth', () => {
       setToken(newToken)
       setUsername(newUsername)
       setRoles(newRoles as UserRole[])
-      router.push('/chat')
+      await router.push('/chat')
       return response
     } finally {
       loading.value = false

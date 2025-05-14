@@ -76,7 +76,7 @@ const handleRegister = async () => {
     await formRef.value.validate()
     await authStore.register(form)
     ElMessage.success('注册成功')
-    router.push('/chat')
+    await router.push('/chat')
   } catch (error) {
     console.error('Register error:', error)
     ElMessage.error('注册失败：' + (error as Error).message)

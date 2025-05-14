@@ -9,6 +9,7 @@ export interface ChatRequest {
 export interface ChatResponse {
   message: string
   modelId: string
+  sessionId: string
 }
 
 export interface ChatHistoryItem {
@@ -21,11 +22,6 @@ export const chatApi = {
   // 获取所有会话
   getAllSessions: () => {
     return request.get<string[]>('/ai/chat/sessions')
-  },
-
-  // 创建新会话
-  createSession: () => {
-    return request.post<string>('/ai/chat/sessions')
   },
 
   // 获取会话历史

@@ -1,5 +1,8 @@
 package com.example.chatbot.entity;
 
+import lombok.Getter;
+
+@Getter
 public enum UserRole {
     ROLE_ADMIN("管理员"),
     ROLE_USER("普通用户"),
@@ -11,7 +14,4 @@ public enum UserRole {
         this.description = description;
     }
 
-    public String getDescription() {
-        return description;
-    }
-} 
+}

@@ -1,8 +1,6 @@
 import axios from 'axios'
 import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { ElMessage } from 'element-plus'
-import { useAuthStore } from '@/store/auth'
-import { getActivePinia } from 'pinia'
 
 // 创建 axios 实例
 const service: AxiosInstance = axios.create({
