@@ -1,31 +1,16 @@
-import axios from 'axios'
-
-const api = axios.create({
-  baseURL: 'http://localhost:8082/ai/auth',
-  timeout: 5000,
-  headers: {
-    'Content-Type': 'application/json'
-  }
-})
-
-export interface LoginRequest {
-  username: string
-  password: string
-}
-
-export interface LoginResponse {
-  token: string
-  username: string
-}
+import request from '@/utils/request'
+import type { LoginRequest, RegisterRequest, AuthResponse } from '@/api/types'
 
 export const authApi = {
-  login: async (request: LoginRequest): Promise<LoginResponse> => {
-    const response = await api.post<LoginResponse>('/login', request)
-    return response.data
+  login: (data: LoginRequest) => {
+    return request.post<AuthResponse>('/ai/auth/login', data)
   },
 
-  register: async (request: LoginRequest): Promise<LoginResponse> => {
-    const response = await api.post<LoginResponse>('/register', request)
-    return response.data
+  register: (data: RegisterRequest) => {
+    return request.post<AuthResponse>('/ai/auth/register', data)
+  },
+
+  logout: () => {
+    return request.post('/ai/auth/logout')
   }
 } 

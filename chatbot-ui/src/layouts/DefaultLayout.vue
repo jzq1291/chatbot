@@ -1,5 +1,5 @@
 <template>
-  <div v-if="userStore.token">
+  <div v-if="authStore.token">
     <el-container class="layout-container">
       <el-aside :width="isCollapse ? '64px' : '200px'" class="sidebar">
         <div class="sidebar-header">
@@ -27,8 +27,8 @@
           </el-menu-item>
         </el-menu>
         <div class="user-info">
-          <span v-if="!isCollapse">{{ userStore.username }}</span>
-          <el-button type="text" @click="handleLogout">
+          <span v-if="!isCollapse">{{ authStore.username }}</span>
+          <el-button link @click="handleLogout">
             <el-icon><SwitchButton /></el-icon>
             <span v-if="!isCollapse">退出</span>
           </el-button>
@@ -44,11 +44,11 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useUserStore } from '@/store/user'
+import { useAuthStore } from '@/store/auth'
 import { useRouter } from 'vue-router'
 import { ChatDotRound, Document, User, Fold, Expand, SwitchButton } from '@element-plus/icons-vue'
 
-const userStore = useUserStore()
+const authStore = useAuthStore()
 const router = useRouter()
 const isCollapse = ref(true)
 
@@ -56,9 +56,12 @@ const toggleSidebar = () => {
   isCollapse.value = !isCollapse.value
 }
 
-const handleLogout = () => {
-  userStore.logout()
-  router.push('/login')
+const handleLogout = async () => {
+  try {
+    await authStore.logout()
+  } catch (error) {
+    console.error('Logout error:', error)
+  }
 }
 </script>
 

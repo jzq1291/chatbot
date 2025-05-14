@@ -23,7 +23,7 @@
           />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" native-type="submit" :loading="loading">
+          <el-button type="primary" native-type="submit" :loading="authStore.loading">
             登录
           </el-button>
         </el-form-item>
@@ -35,17 +35,16 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import { useUserStore } from '@/store/user'
 import { ElMessage } from 'element-plus'
 import type { FormInstance } from 'element-plus'
-import { authApi } from '@/api/auth'
+import { useAuthStore } from '@/store/auth'
+import type { LoginRequest } from '@/api/auth'
 
 const router = useRouter()
-const userStore = useUserStore()
+const authStore = useAuthStore()
 const formRef = ref<FormInstance>()
-const loading = ref(false)
 
-const form = reactive({
+const form = reactive<LoginRequest>({
   username: '',
   password: ''
 })
@@ -66,21 +65,12 @@ const handleLogin = async () => {
   
   try {
     await formRef.value.validate()
-    loading.value = true
-    
-    const response = await authApi.login({
-      username: form.username,
-      password: form.password
-    })
-    
-    userStore.setAuth(response.token, response.username)
+    await authStore.login(form.username, form.password)
     ElMessage.success('登录成功')
     router.push('/chat')
   } catch (error) {
     console.error('Login error:', error)
     ElMessage.error('登录失败：' + (error as Error).message)
-  } finally {
-    loading.value = false
   }
 }
 </script>

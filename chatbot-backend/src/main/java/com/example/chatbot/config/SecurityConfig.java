@@ -1,7 +1,8 @@
 package com.example.chatbot.config;
 
 import com.example.chatbot.security.JwtAuthenticationFilter;
-import com.example.chatbot.security.JwtService;
+import com.example.chatbot.security.JwtTokenProvider;
+import com.example.chatbot.service.TokenBlacklistService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -28,15 +29,16 @@ import java.util.List;
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
-    private final JwtService jwtService;
+    private final JwtTokenProvider jwtTokenProvider;
     private final UserDetailsService userDetailsService;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @Value("${cors.allowed-origins}")
     private String allowedOrigins;
 
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter() {
-        return new JwtAuthenticationFilter(jwtService, userDetailsService);
+        return new JwtAuthenticationFilter(jwtTokenProvider, userDetailsService, tokenBlacklistService);
     }
 
     @Bean
@@ -45,7 +47,7 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/ai/**").permitAll()
+                .requestMatchers("/ai/auth/login", "/ai/auth/register").permitAll()
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session

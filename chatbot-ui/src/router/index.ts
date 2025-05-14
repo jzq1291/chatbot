@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useUserStore } from '@/store/user'
+import { useAuthStore } from '@/store/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -40,12 +40,12 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from, next) => {
-  const userStore = useUserStore()
+  const authStore = useAuthStore()
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
 
-  if (requiresAuth && !userStore.token) {
+  if (requiresAuth && !authStore.token) {
     next('/login')
-  } else if (to.path === '/login' && userStore.token) {
+  } else if (to.path === '/login' && authStore.token) {
     next('/chat')
   } else {
     next()

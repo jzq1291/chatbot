@@ -2,6 +2,10 @@
   <div class="chat-container">
     <!-- 左侧边栏：包含新建聊天按钮和聊天历史列表 -->
     <div class="sidebar">
+      <div class="logo">
+        <img src="@/assets/ai-logo.svg" alt="AI Assistant" class="logo-img" />
+        <span class="logo-text">AI 助手</span>
+      </div>
       <el-button type="primary" @click="createNewChat" class="new-chat-btn">
         新建聊天
       </el-button>
@@ -14,13 +18,9 @@
           @click="switchSession(sessionId)"
         >
           <span class="session-title">会话 {{ sessionId.slice(0, 8) }}</span>
-          <el-button
-            type="link"
-            class="delete-btn"
-            @click.stop="deleteSession(sessionId)"
-          >
-            删除
-          </el-button>
+          <el-icon class="delete-icon" @click.stop="deleteSession(sessionId)">
+            <Close />
+          </el-icon>
         </div>
       </div>
     </div>
@@ -58,7 +58,7 @@
           type="textarea"
           :rows="3"
           placeholder="请输入消息..."
-          @keyup.enter.ctrl="sendMessage"
+          @keyup.enter="handleEnterKey"
         />
         <div class="button-group">
           <el-button type="primary" @click="sendMessage" :loading="loading">
@@ -74,9 +74,12 @@
 import { ref, onMounted, nextTick, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useChatStore } from '@/store/chat'
+import { Close } from '@element-plus/icons-vue'
+import { useAuthStore } from '@/store/auth'
 
 // 初始化 store
 const store = useChatStore()
+const authStore = useAuthStore()
 // 创建响应式变量：输入消息
 const inputMessage = ref('')
 // 创建响应式变量：消息容器引用
@@ -89,6 +92,14 @@ const handleModelChange = (model: string) => {
   store.selectedModel = model
 }
 
+// 处理回车键
+const handleEnterKey = (e: KeyboardEvent) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    sendMessage()
+  }
+}
+
 // 发送消息
 const sendMessage = async () => {
   if (!inputMessage.value.trim()) {
@@ -96,10 +107,11 @@ const sendMessage = async () => {
     return
   }
 
+  const message = inputMessage.value
+  inputMessage.value = '' // 立即清空输入框
   loading.value = true
   try {
-    await store.sendMessage(inputMessage.value, store.selectedModel)
-    inputMessage.value = ''
+    await store.sendMessage(message, store.selectedModel)
     await nextTick()
     scrollToBottom()
   } catch (error) {
@@ -140,18 +152,18 @@ const deleteSession = async (sessionId: string) => {
 
 // 组件挂载时的初始化
 onMounted(async () => {
-  try {
-    await Promise.all([
-      store.loadSessions(),
-      store.loadAvailableModels()
-    ])
-    if (store.sessions.length > 0) {
-      await store.switchSession(store.sessions[0])
-    } else {
-      store.createNewChat()
+  if (authStore.token) {
+    try {
+      await Promise.all([
+        store.loadSessions(),
+        store.loadAvailableModels()
+      ])
+    } catch (error: any) {
+      // 如果是 403 错误，说明可能是登出导致的，不需要显示错误
+      if (error.response?.status !== 403) {
+        console.error('Failed to load initial data:', error)
+      }
     }
-  } catch (error) {
-    ElMessage.error('初始化失败：' + (error as Error).message)
   }
 })
 </script>
@@ -170,6 +182,27 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   padding: 20px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 10px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+}
+
+.logo-img {
+  width: 32px;
+  height: 32px;
+  margin-right: 10px;
+}
+
+.logo-text {
+  font-size: 18px;
+  font-weight: bold;
+  color: #409EFF;
 }
 
 .new-chat-btn {
@@ -208,12 +241,19 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
-.delete-btn {
+.delete-icon {
   opacity: 0;
   transition: opacity 0.3s;
+  cursor: pointer;
+  color: #909399;
+  font-size: 16px;
 }
 
-.chat-session:hover .delete-btn {
+.delete-icon:hover {
+  color: #F56C6C;
+}
+
+.chat-session:hover .delete-icon {
   opacity: 1;
 }
 

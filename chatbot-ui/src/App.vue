@@ -3,9 +3,6 @@ import { ref } from 'vue'
 import { ChatDotRound, Collection, Fold, Expand, User } from '@element-plus/icons-vue'
 
 const isCollapse = ref(true)
-const toggleSidebar = () => {
-  isCollapse.value = !isCollapse.value
-}
 </script>
 
 <template>

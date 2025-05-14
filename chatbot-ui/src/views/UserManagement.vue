@@ -6,20 +6,21 @@
     </div>
 
     <div class="user-list">
-      <el-table :data="userList" style="width: 100%">
+      <el-table :data="userStore.userList" v-loading="userStore.loading" style="width: 100%">
+        <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="username" label="用户名" />
         <el-table-column prop="email" label="邮箱" />
         <el-table-column prop="roles" label="角色">
           <template #default="{ row }">
-            <el-tag v-for="role in row.roles" :key="role" class="role-tag">
-              {{ role }}
+            <el-tag v-for="role in row.roles" :key="role" :type="role === 'ROLE_ADMIN' ? 'danger' : 'success'" class="role-tag">
+              {{ role === 'ROLE_ADMIN' ? '管理员' : '普通用户' }}
             </el-tag>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="200">
           <template #default="{ row }">
-            <el-button type="primary" size="small" @click="showEditDialog(row)">编辑</el-button>
-            <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+            <el-button link type="primary" @click="showEditDialog(row)">编辑</el-button>
+            <el-button link type="danger" @click="handleDelete(row.id)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -29,36 +30,36 @@
     <el-dialog
       v-model="dialogVisible"
       :title="isEditMode ? '编辑用户' : '添加用户'"
-      width="50%"
+      width="500px"
     >
-      <el-form :model="userForm" label-width="80px" :rules="rules" ref="userFormRef">
+      <el-form
+        ref="formRef"
+        :model="newUser"
+        :rules="rules"
+        label-width="80px"
+      >
         <el-form-item label="用户名" prop="username">
-          <el-input v-model="userForm.username" />
+          <el-input v-model="newUser.username" />
         </el-form-item>
         <el-form-item label="邮箱" prop="email">
-          <el-input v-model="userForm.email" />
+          <el-input v-model="newUser.email" />
         </el-form-item>
-        <el-form-item label="密码" prop="password" v-if="!isEditMode">
-          <el-input v-model="userForm.password" type="password" />
-        </el-form-item>
-        <el-form-item label="密码" prop="password" v-else>
-          <el-input v-model="userForm.password" type="password" placeholder="留空表示不修改密码" />
+        <el-form-item label="密码" prop="password">
+          <el-input v-model="newUser.password" type="password" />
         </el-form-item>
         <el-form-item label="角色" prop="roles">
-          <el-select v-model="userForm.roles" multiple placeholder="请选择角色">
-            <el-option
-              v-for="option in roleOptions"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
+          <el-select v-model="newUser.roles" multiple style="width: 100%">
+            <el-option label="管理员" value="ROLE_ADMIN" />
+            <el-option label="普通用户" value="ROLE_USER" />
           </el-select>
         </el-form-item>
       </el-form>
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleSave">确定</el-button>
+          <el-button type="primary" @click="handleSave" :loading="userStore.loading">
+            确定
+          </el-button>
         </span>
       </template>
     </el-dialog>
@@ -66,31 +67,28 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { ElMessage, ElMessageBox } from 'element-plus';
-import type { FormInstance } from 'element-plus';
+import { ref, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import type { FormInstance, FormRules } from 'element-plus'
+import { useUserStore } from '@/store/user'
+import { useAuthStore } from '@/store/auth'
+import type { User } from '@/api/user'
 
-interface User {
-  id?: number;
-  username: string;
-  email: string;
-  password?: string;
-  roles: string[];
-}
+const userStore = useUserStore()
+const authStore = useAuthStore()
+const dialogVisible = ref(false)
+const isEditMode = ref(false)
 
-const userList = ref<User[]>([]);
-const dialogVisible = ref(false);
-const isEditMode = ref(false);
-const userFormRef = ref<FormInstance>();
-
-const userForm = ref<User>({
+const formRef = ref<FormInstance>()
+const newUser = ref<User>({
+  id: 0,
   username: '',
   email: '',
   password: '',
-  roles: []
-});
+  roles: ['ROLE_USER']
+})
 
-const rules = {
+const rules = ref<FormRules>({
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
     { min: 3, max: 20, message: '长度在 3 到 20 个字符', trigger: 'blur' }
@@ -101,116 +99,83 @@ const rules = {
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, message: '密码长度不能小于6个字符', trigger: 'blur' }
+    { min: 6, max: 20, message: '长度在 6 到 20 个字符', trigger: 'blur' }
   ],
   roles: [
     { required: true, message: '请选择角色', trigger: 'change' }
   ]
-};
+})
 
-// 添加角色选项
-const roleOptions = [
-  { label: '管理员', value: 'ROLE_ADMIN' },
-  { label: '普通用户', value: 'ROLE_USER' },
-  { label: '知识库管理员', value: 'ROLE_KNOWLEDGEMANAGER' }
-];
-
-// 加载用户列表
-const loadUsers = async () => {
-  try {
-    const response = await fetch('http://localhost:8082/ai/users');
-    userList.value = await response.json();
-  } catch (error) {
-    console.error('加载用户列表失败:', error);
-    ElMessage.error('加载用户列表失败');
-  }
-};
-
-// 显示添加对话框
 const showAddDialog = () => {
-  userForm.value = {
+  isEditMode.value = false
+  newUser.value = {
+    id: 0,
     username: '',
     email: '',
     password: '',
-    roles: []
-  };
-  isEditMode.value = false;
-  dialogVisible.value = true;
-};
+    roles: ['ROLE_USER']
+  }
+  dialogVisible.value = true
+}
 
-// 显示编辑对话框
 const showEditDialog = (row: User) => {
-  userForm.value = { ...row, password: '' };
-  isEditMode.value = true;
-  dialogVisible.value = true;
-};
+  isEditMode.value = true
+  newUser.value = { ...row }
+  dialogVisible.value = true
+}
 
-// 保存用户
 const handleSave = async () => {
-  if (!userFormRef.value) return;
+  if (!formRef.value) return
   
-  await userFormRef.value.validate(async (valid) => {
+  await formRef.value.validate(async (valid) => {
     if (valid) {
       try {
-        const url = isEditMode.value
-          ? `http://localhost:8082/ai/users/${userForm.value.id}`
-          : 'http://localhost:8082/ai/users';
-        
-        const method = isEditMode.value ? 'PUT' : 'POST';
-        
-        const response = await fetch(url, {
-          method,
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(userForm.value)
-        });
-
-        if (!response.ok) {
-          throw new Error('保存失败');
+        if (isEditMode.value) {
+          await userStore.updateUser(newUser.value)
+          ElMessage.success('更新成功')
+        } else {
+          await userStore.createUser(newUser.value)
+          ElMessage.success('创建成功')
         }
-
-        ElMessage.success(isEditMode.value ? '更新成功' : '添加成功');
-        dialogVisible.value = false;
-        loadUsers();
+        dialogVisible.value = false
       } catch (error) {
-        console.error('保存失败:', error);
-        ElMessage.error('保存失败');
+        console.error('保存失败:', error)
       }
     }
-  });
-};
+  })
+}
 
-// 删除用户
-const handleDelete = async (row: User) => {
-  if (!row.id) return;
-  
+const handleDelete = async (id: number) => {
   try {
-    await ElMessageBox.confirm('确定要删除这个用户吗？', '提示', {
-      type: 'warning'
-    });
-    
-    const response = await fetch(`http://localhost:8082/ai/users/${row.id}`, {
-      method: 'DELETE'
-    });
-
-    if (!response.ok) {
-      throw new Error('删除失败');
-    }
-
-    ElMessage.success('删除成功');
-    loadUsers();
+    await ElMessageBox.confirm(
+      '确定要删除这个用户吗？',
+      '警告',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    await userStore.deleteUser(id)
+    ElMessage.success('删除成功')
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('删除失败:', error);
-      ElMessage.error('删除失败');
+      console.error('删除失败:', error)
     }
   }
-};
+}
 
-onMounted(() => {
-  loadUsers();
-});
+onMounted(async () => {
+  if (authStore.token) {
+    try {
+      await userStore.loadUsers()
+    } catch (error: any) {
+      if (error.response?.status !== 403) {
+        ElMessage.error('加载用户列表失败：' + (error as Error).message)
+      }
+    }
+  }
+})
 </script>
 
 <style scoped>

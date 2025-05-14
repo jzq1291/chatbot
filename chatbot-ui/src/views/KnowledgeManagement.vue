@@ -7,7 +7,7 @@
 
     <div class="search-bar">
       <el-input
-        v-model="searchKeyword"
+        v-model="store.searchKeyword"
         placeholder="搜索知识..."
         @input="handleSearch"
         clearable
@@ -19,7 +19,7 @@
     </div>
 
     <div class="knowledge-list">
-      <el-table :data="knowledgeList" style="width: 100%">
+      <el-table :data="store.knowledgeList" style="width: 100%" v-loading="store.loading">
         <el-table-column prop="title" label="标题">
           <template #default="{ row }">
             <el-link type="primary" @click="showEditDialog(row)">{{ row.title }}</el-link>
@@ -58,7 +58,7 @@
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleSave">确定</el-button>
+          <el-button type="primary" @click="handleSave" :loading="store.loading">确定</el-button>
         </span>
       </template>
     </el-dialog>
@@ -69,10 +69,12 @@
 import { ref, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Search } from '@element-plus/icons-vue';
-import { knowledgeApi, type KnowledgeBase } from '@/api/knowledge';
+import { useKnowledgeStore } from '@/store/knowledge';
+import type { KnowledgeBase } from '@/api/knowledge';
+import { useAuthStore } from '@/store/auth'
 
-const searchKeyword = ref('');
-const knowledgeList = ref<KnowledgeBase[]>([]);
+const store = useKnowledgeStore();
+const authStore = useAuthStore();
 const dialogVisible = ref(false);
 const isEditMode = ref(false);
 const newKnowledge = ref<KnowledgeBase>({
@@ -81,27 +83,12 @@ const newKnowledge = ref<KnowledgeBase>({
   category: ''
 });
 
-// 加载知识列表
-const loadKnowledge = async () => {
-  try {
-    const response = await knowledgeApi.searchKnowledge('');
-    knowledgeList.value = Array.isArray(response.data) ? response.data : [];
-  } catch (error) {
-    console.error('加载知识列表失败:', error);
-    ElMessage.error('加载知识列表失败');
-    knowledgeList.value = [];
-  }
-};
-
 // 搜索知识
 const handleSearch = async () => {
   try {
-    const response = await knowledgeApi.searchKnowledge(searchKeyword.value);
-    knowledgeList.value = Array.isArray(response.data) ? response.data : [];
+    await store.searchKnowledge(store.searchKeyword);
   } catch (error) {
-    console.error('搜索失败:', error);
     ElMessage.error('搜索失败');
-    knowledgeList.value = [];
   }
 };
 
@@ -127,14 +114,13 @@ const showEditDialog = (row: KnowledgeBase) => {
 const handleSave = async () => {
   try {
     if (isEditMode.value) {
-      await knowledgeApi.updateKnowledge(newKnowledge.value);
+      await store.updateKnowledge(newKnowledge.value);
       ElMessage.success('保存成功');
     } else {
-      await knowledgeApi.addKnowledge(newKnowledge.value);
+      await store.addKnowledge(newKnowledge.value);
       ElMessage.success('添加成功');
     }
     dialogVisible.value = false;
-    loadKnowledge();
   } catch (error) {
     ElMessage.error(isEditMode.value ? '保存失败' : '添加失败');
   }
@@ -146,12 +132,12 @@ const handleDelete = async (row: KnowledgeBase) => {
   
   try {
     await ElMessageBox.confirm('确定要删除这条知识吗？', '提示', {
-      type: 'warning'
+      confirmButtonText: '确定',
+      cancelButtonText: '取消'
     });
     
-    await knowledgeApi.deleteKnowledge(row.id);
+    await store.deleteKnowledge(row.id);
     ElMessage.success('删除成功');
-    loadKnowledge();
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error('删除失败');
@@ -159,9 +145,19 @@ const handleDelete = async (row: KnowledgeBase) => {
   }
 };
 
-onMounted(() => {
-  loadKnowledge();
-});
+// 组件挂载时的初始化
+onMounted(async () => {
+  if (authStore.token) {
+    try {
+      await store.loadKnowledge()
+    } catch (error: any) {
+      // 如果是 403 错误，说明可能是登出导致的，不需要显示错误
+      if (error.response?.status !== 403) {
+        ElMessage.error('加载知识库列表失败：' + (error as Error).message)
+      }
+    }
+  }
+})
 </script>
 
 <style scoped>
