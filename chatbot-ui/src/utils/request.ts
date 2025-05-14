@@ -19,18 +19,23 @@ const publicApis = ['/ai/auth/login', '/ai/auth/register']
 // 请求拦截器
 service.interceptors.request.use(
   (config) => {
+    console.log('Request config:', {
+      url: config.url,
+      method: config.method,
+      headers: config.headers,
+      data: config.data
+    })
+    
     // 如果是公开接口，不添加 token
     if (config.url && publicApis.includes(config.url)) {
+      console.log('Public API request:', config.url)
       return config
     }
 
-    const pinia = getActivePinia()
-    if (pinia) {
-      const authStore = useAuthStore(pinia)
-      const token = authStore.token
-      if (token) {
-        config.headers['Authorization'] = `Bearer ${token}`
-      }
+    // 从 localStorage 获取 token
+    const token = localStorage.getItem('token')
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`
     }
     return config
   },

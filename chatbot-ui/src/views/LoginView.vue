@@ -26,6 +26,7 @@
           <el-button type="primary" native-type="submit" :loading="authStore.loading">
             登录
           </el-button>
+          <el-button @click="router.push('/register')">注册账号</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -38,7 +39,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance } from 'element-plus'
 import { useAuthStore } from '@/store/auth'
-import type { LoginRequest } from '@/api/auth'
+import type { LoginRequest } from '@/api/types'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -104,5 +105,9 @@ const handleLogin = async () => {
 .el-form-item:last-child {
   margin-bottom: 0;
   text-align: center;
+}
+
+.el-button {
+  margin: 0 5px;
 }
 </style> 

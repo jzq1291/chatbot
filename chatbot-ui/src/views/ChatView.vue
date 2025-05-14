@@ -136,8 +136,12 @@ const switchSession = async (sessionId: string) => {
 }
 
 // 创建新会话
-const createNewChat = () => {
-  store.createNewChat()
+const createNewChat = async () => {
+  try {
+    await store.createNewChat()
+  } catch (error) {
+    ElMessage.error('创建新会话失败：' + (error as Error).message)
+  }
 }
 
 // 删除会话

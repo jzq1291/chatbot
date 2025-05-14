@@ -17,11 +17,11 @@
             <el-icon><ChatDotRound /></el-icon>
             <template #title>聊天</template>
           </el-menu-item>
-          <el-menu-item index="/knowledge">
-            <el-icon><Document /></el-icon>
-            <template #title>知识库</template>
+          <el-menu-item v-if="authStore.checkAnyRole(['ROLE_ADMIN', 'ROLE_KNOWLEDGEMANAGER'])" index="/knowledge">
+            <el-icon><Collection /></el-icon>
+            <template #title>知识库管理</template>
           </el-menu-item>
-          <el-menu-item index="/users">
+          <el-menu-item v-if="authStore.checkRole('ROLE_ADMIN')" index="/users">
             <el-icon><User /></el-icon>
             <template #title>用户管理</template>
           </el-menu-item>
@@ -46,7 +46,7 @@
 import { ref } from 'vue'
 import { useAuthStore } from '@/store/auth'
 import { useRouter } from 'vue-router'
-import { ChatDotRound, Document, User, Fold, Expand, SwitchButton } from '@element-plus/icons-vue'
+import { ChatDotRound, Collection, User, Fold, Expand, SwitchButton } from '@element-plus/icons-vue'
 
 const authStore = useAuthStore()
 const router = useRouter()

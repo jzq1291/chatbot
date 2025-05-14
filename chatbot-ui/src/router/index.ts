@@ -11,6 +11,12 @@ const router = createRouter({
       meta: { requiresAuth: false }
     },
     {
+      path: '/register',
+      name: 'register',
+      component: () => import('@/views/RegisterView.vue'),
+      meta: { requiresAuth: false }
+    },
+    {
       path: '/',
       component: () => import('@/layouts/DefaultLayout.vue'),
       meta: { requiresAuth: true },
@@ -45,7 +51,7 @@ router.beforeEach((to, from, next) => {
 
   if (requiresAuth && !authStore.token) {
     next('/login')
-  } else if (to.path === '/login' && authStore.token) {
+  } else if ((to.path === '/login' || to.path === '/register') && authStore.token) {
     next('/chat')
   } else {
     next()

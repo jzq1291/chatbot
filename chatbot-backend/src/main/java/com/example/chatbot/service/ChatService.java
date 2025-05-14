@@ -97,7 +97,6 @@ public class ChatService {
                 .content();
 
         // 清理AI响应
-        assert aiResponse != null;
         String cleanedResponse = cleanAiResponse(aiResponse);
 
         // 保存AI响应
@@ -238,7 +237,6 @@ public class ChatService {
 
             // 将响应分块发送
             // 每次发送一个字符，模拟流式效果
-            assert response != null;
             for (char c : response.toCharArray()) {
                 try {
                     emitter.send(SseEmitter.event()

@@ -23,6 +23,11 @@ export const chatApi = {
     return request.get<string[]>('/ai/chat/sessions')
   },
 
+  // 创建新会话
+  createSession: () => {
+    return request.post<string>('/ai/chat/sessions')
+  },
+
   // 获取会话历史
   getHistory: (sessionId: string) => {
     return request.get<ChatHistoryItem[]>(`/ai/chat/history/${sessionId}`)

@@ -55,6 +55,12 @@ export const useChatStore = defineStore('chat', () => {
       sessions.value = response
       if (sessions.value.length > 0) {
         currentSessionId.value = sessions.value[0]
+        // 加载第一个会话的历史记录
+        const history = await chatApi.getHistory(sessions.value[0])
+        messages.value = history.map((item: any) => ({
+          role: item.role || 'assistant',
+          content: item.message
+        }))
       }
     } catch (error) {
       console.error('Failed to load sessions:', error)
@@ -65,6 +71,8 @@ export const useChatStore = defineStore('chat', () => {
   // 切换会话
   const switchSession = async (sessionId: string) => {
     try {
+      // 先清空当前消息
+      messages.value = []
       const history = await chatApi.getHistory(sessionId)
       messages.value = history.map((item: any) => ({
         role: item.role || 'assistant',
@@ -78,11 +86,16 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   // 创建新会话
-  const createNewChat = () => {
-    const newSessionId = Date.now().toString()
-    sessions.value.unshift(newSessionId)
-    currentSessionId.value = newSessionId
-    messages.value = []
+  const createNewChat = async () => {
+    try {
+      const newSessionId = await chatApi.createSession()
+      sessions.value.unshift(newSessionId)
+      currentSessionId.value = newSessionId
+      messages.value = []
+    } catch (error) {
+      console.error('Failed to create new session:', error)
+      throw error
+    }
   }
 
   // 删除会话
@@ -133,6 +146,15 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  // 重置状态
+  const resetState = () => {
+    sessions.value = []
+    currentSessionId.value = ''
+    messages.value = []
+    availableModels.value = []
+    selectedModel.value = ''
+  }
+
   return {
     sessions,
     currentSessionId,
@@ -144,6 +166,7 @@ export const useChatStore = defineStore('chat', () => {
     switchSession,
     createNewChat,
     deleteSession,
-    sendMessage
+    sendMessage,
+    resetState
   }
 }) 

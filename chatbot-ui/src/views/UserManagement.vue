@@ -12,8 +12,8 @@
         <el-table-column prop="email" label="邮箱" />
         <el-table-column prop="roles" label="角色">
           <template #default="{ row }">
-            <el-tag v-for="role in row.roles" :key="role" :type="role === 'ROLE_ADMIN' ? 'danger' : 'success'" class="role-tag">
-              {{ role === 'ROLE_ADMIN' ? '管理员' : '普通用户' }}
+            <el-tag v-for="role in row.roles" :key="role" :type="role === 'ROLE_ADMIN' ? 'danger' : role === 'ROLE_KNOWLEDGEMANAGER' ? 'warning' : 'success'" class="role-tag">
+              {{ role === 'ROLE_ADMIN' ? '管理员' : role === 'ROLE_KNOWLEDGEMANAGER' ? '知识库管理员' : '普通用户' }}
             </el-tag>
           </template>
         </el-table-column>
@@ -51,6 +51,7 @@
           <el-select v-model="newUser.roles" multiple style="width: 100%">
             <el-option label="管理员" value="ROLE_ADMIN" />
             <el-option label="普通用户" value="ROLE_USER" />
+            <el-option label="知识库管理员" value="ROLE_KNOWLEDGEMANAGER" />
           </el-select>
         </el-form-item>
       </el-form>
