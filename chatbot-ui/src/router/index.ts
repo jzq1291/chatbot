@@ -55,14 +55,20 @@ router.beforeEach((to, from, next) => {
     ? to.matched.find(record => record.meta.roles)?.meta.roles as UserRole[]
     : null
 
+  // 如果路由需要认证但用户未登录，重定向到登录页
   if (requiresAuth && !authStore.token) {
     next('/login')
-  } else if ((to.path === '/login' || to.path === '/register') && authStore.token) {
+  } 
+  // 如果用户已登录但访问登录/注册页，重定向到聊天页
+  else if ((to.path === '/login' || to.path === '/register') && authStore.token) {
     next('/chat')
-  } else if (requiredRoles && !authStore.checkAnyRole(requiredRoles)) {
-    // 如果没有所需角色，重定向到聊天页面
+  } 
+  // 如果路由需要特定角色但用户没有，重定向到聊天页
+  else if (requiredRoles && !authStore.checkAnyRole(requiredRoles)) {
     next('/chat')
-  } else {
+  } 
+  // 其他情况正常导航
+  else {
     next()
   }
 })

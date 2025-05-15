@@ -61,6 +61,9 @@ export const useAuthStore = defineStore('auth', () => {
       setRoles(newRoles as UserRole[])
       await router.push('/chat')
       return response
+    } catch (error) {
+      console.error('Login error:', error)
+      throw error
     } finally {
       loading.value = false
     }

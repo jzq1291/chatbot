@@ -79,7 +79,6 @@ const handleRegister = async () => {
     await router.push('/chat')
   } catch (error) {
     console.error('Register error:', error)
-    ElMessage.error('注册失败：' + (error as Error).message)
   }
 }
 </script>

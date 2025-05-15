@@ -1,6 +1,7 @@
 import axios from 'axios'
 import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { ElMessage } from 'element-plus'
+import router from '@/router'
 
 // 创建 axios 实例
 const service: AxiosInstance = axios.create({
@@ -50,8 +51,22 @@ service.interceptors.response.use(
   },
   (error) => {
     console.error('Response error:', error)
-    const message = error.response?.data?.message || '请求失败'
+    const responseData = error.response?.data
+    const errorCode = responseData?.errorCode
+    const message = responseData?.message || '请求失败'
+    
+    // 统一显示后端返回的错误信息
     ElMessage.error(message)
+    
+    // 如果是认证相关错误，清除token并跳转到登录页
+    if (errorCode?.startsWith('AUTH_')) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('username')
+      localStorage.removeItem('roles')
+      // 使用 router 进行导航，而不是直接修改 location
+      router.push('/login')
+    }
+    
     return Promise.reject(error)
   }
 )

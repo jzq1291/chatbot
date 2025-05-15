@@ -7,7 +7,6 @@
       <el-form
         ref="formRef"
         :model="form"
-        :rules="rules"
         label-width="80px"
         @submit.prevent="handleLogin"
       >
@@ -50,17 +49,6 @@ const form = reactive<LoginRequest>({
   password: ''
 })
 
-const rules = {
-  username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' },
-    { min: 3, max: 20, message: '长度在 3 到 20 个字符', trigger: 'blur' }
-  ],
-  password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, max: 20, message: '长度在 6 到 20 个字符', trigger: 'blur' }
-  ]
-}
-
 const handleLogin = async () => {
   if (!formRef.value) return
   
@@ -68,10 +56,9 @@ const handleLogin = async () => {
     await formRef.value.validate()
     await authStore.login(form.username, form.password)
     ElMessage.success('登录成功')
-    router.push('/chat')
   } catch (error) {
     console.error('Login error:', error)
-    ElMessage.error('登录失败：' + (error as Error).message)
+    // 错误已经在 request.ts 中统一处理
   }
 }
 </script>
