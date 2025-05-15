@@ -6,8 +6,8 @@ import com.example.chatbot.dto.ChatResponse;
 import com.example.chatbot.entity.ChatMessage;
 import com.example.chatbot.entity.KnowledgeBase;
 import com.example.chatbot.entity.User;
-import com.example.chatbot.repository.ChatMessageRepository;
-import com.example.chatbot.repository.UserRepository;
+import com.example.chatbot.mapper.ChatMessageMapper;
+import com.example.chatbot.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -31,246 +31,79 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ChatService {
-    private final ChatMessageRepository chatMessageRepository;
     private final ChatClient chatClient;
-    private final KnowledgeService knowledgeService;
     private final ModelProperties modelProperties;
-    private final UserRepository userRepository;
-
-    private User getCurrentUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String username = authentication.getName();
-        return userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-    }
+    private final ChatMessageMapper chatMessageMapper;
+    private final UserMapper userMapper;
+    private final KnowledgeService knowledgeService;
 
     @Transactional
-    public ChatResponse processMessage(ChatRequest request) {
-        User currentUser = getCurrentUser();
-        String sessionId = getOrCreateSessionId(request.getSessionId());
-        String modelId = request.getModelId() != null ? request.getModelId() : "qwen3";
-        
-        // 清理用户消息
-        String cleanedMessage = cleanMessage(request.getMessage());
-        saveUserMessage(cleanedMessage, sessionId, currentUser);
-        
-        // 搜索相关知识库内容
-        List<KnowledgeBase> relevantDocs = knowledgeService.searchByKeyword(cleanedMessage);
-        StringBuilder contextBuilder = new StringBuilder();
-        if (!relevantDocs.isEmpty()) {
-            contextBuilder.append("相关文档：\n");
-            for (KnowledgeBase doc : relevantDocs) {
-                contextBuilder.append("标题：").append(doc.getTitle()).append("\n");
-                contextBuilder.append("内容：").append(doc.getContent()).append("\n\n");
-            }
+    public ChatResponse chat(ChatRequest request) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        User user = userMapper.findByUsername(authentication.getName());
+        if (user == null) {
+            throw new RuntimeException("User not found");
         }
 
-        // 构建消息上下文
-        List<Message> messages = buildMessageContext(sessionId);
-        
-        // 如果有相关文档，添加到用户消息中
-        if (!contextBuilder.isEmpty()) {
-            String enhancedMessage = cleanedMessage + "\n\n" + contextBuilder;
-            messages.add(new UserMessage(enhancedMessage));
-        } else {
-            messages.add(new UserMessage(cleanedMessage));
-        }
-
-        // 获取模型配置
-        ModelProperties.ModelOption modelOptions = modelProperties.getOptions().get(modelId);
-        if (modelOptions == null) {
-            throw new IllegalArgumentException("Invalid model ID: " + modelId);
-        }
-
-        ChatOptions options = ChatOptions.builder()
-                .model(modelOptions.getModel())
-                .temperature(modelOptions.getTemperature())
-                .topP(modelOptions.getTopP())
-                .topK(modelOptions.getTopK())
-                .build();
-
-        // 调用AI模型
-        String aiResponse = chatClient.prompt()
-                .messages(messages)
-                .options(options)
-                .call()
-                .content();
-
-        // 清理AI响应
-        String cleanedResponse = cleanAiResponse(aiResponse);
-
-        // 保存AI响应
-        saveAssistantMessage(cleanedResponse, sessionId, currentUser);
-
-        return ChatResponse.builder()
-                .message(cleanedResponse)
-                .sessionId(sessionId)
-                .modelId(modelId)
-                .build();
-    }
-
-    private String getOrCreateSessionId(String sessionId) {
-        if (sessionId == null || sessionId.isEmpty()) {
-            return UUID.randomUUID().toString();
-        }
-        return sessionId;
-    }
-
-    private void saveUserMessage(String content, String sessionId, User user) {
+        // 保存用户消息
         ChatMessage userMessage = new ChatMessage();
-        userMessage.setContent(content);
+        userMessage.setContent(request.getMessage());
         userMessage.setRole("user");
-        userMessage.setSessionId(sessionId);
-        userMessage.setUser(user);
-        chatMessageRepository.save(userMessage);
-    }
+        userMessage.setSessionId(request.getSessionId());
+        userMessage.setUserId(user.getId());
+        chatMessageMapper.insert(userMessage);
 
-    private void saveAssistantMessage(String content, String sessionId, User user) {
-        ChatMessage assistantMessage = new ChatMessage();
-        assistantMessage.setContent(content);
-        assistantMessage.setRole("assistant");
-        assistantMessage.setSessionId(sessionId);
-        assistantMessage.setUser(user);
-        chatMessageRepository.save(assistantMessage);
-    }
-
-    private List<Message> buildMessageContext(String sessionId) {
-        // 获取最近的10条消息
-        List<ChatMessage> history = chatMessageRepository.findLast10BySessionIdAndUserOrderByCreatedAtDesc(sessionId, getCurrentUser());
-        // 反转列表以保持时间顺序
-        Collections.reverse(history);
-
-        // 构建对话上下文
+        // 获取历史消息
+        List<ChatMessage> history = chatMessageMapper.findBySessionIdAndUserId(request.getSessionId(), user.getId());
         List<Message> messages = new ArrayList<>();
-        
-        // 添加系统提示，包含知识库信息
-        String systemPrompt = "你是一个专业的客服助手，请根据以下知识库内容回答用户问题。如果知识库中没有相关信息，请明确告知用户。\n\n";
-        messages.add(new SystemMessage(systemPrompt));
+
+        // 添加系统消息
+        messages.add(new SystemMessage(modelProperties.getSystemPrompt()));
 
         // 添加历史消息
         for (ChatMessage msg : history) {
             if ("user".equals(msg.getRole())) {
                 messages.add(new UserMessage(msg.getContent()));
-            } else {
+            } else if ("assistant".equals(msg.getRole())) {
                 messages.add(new AssistantMessage(msg.getContent()));
             }
         }
 
-        return messages;
+        // 添加当前用户消息
+        messages.add(new UserMessage(request.getMessage()));
+
+        // 调用AI服务
+        AssistantMessage response = chatClient.call(messages, ChatOptions.builder()
+                .withTemperature(modelProperties.getTemperature())
+                .build());
+
+        // 保存AI响应
+        ChatMessage assistantMessage = new ChatMessage();
+        assistantMessage.setContent(response.getContent());
+        assistantMessage.setRole("assistant");
+        assistantMessage.setSessionId(request.getSessionId());
+        assistantMessage.setUserId(user.getId());
+        chatMessageMapper.insert(assistantMessage);
+
+        return new ChatResponse(response.getContent());
     }
 
-    private String cleanAiResponse(String response) {
-        if (response.contains("<think>")) {
-            int startIndex = response.indexOf("<think>");
-            int endIndex = response.indexOf("</think>");
-            if (startIndex != -1 && endIndex != -1) {
-                return response.substring(endIndex + 8).trim();
-            }
+    public List<String> getChatSessions() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        User user = userMapper.findByUsername(authentication.getName());
+        if (user == null) {
+            throw new RuntimeException("User not found");
         }
-        return response;
-    }
-
-    public List<ChatResponse> getHistory(String sessionId) {
-        User currentUser = getCurrentUser();
-        List<ChatMessage> messages = chatMessageRepository.findBySessionIdAndUserOrderByCreatedAtAsc(sessionId, currentUser);
-        return messages.stream()
-                .map(msg -> ChatResponse.builder()
-                        .message(msg.getContent())
-                        .sessionId(msg.getSessionId())
-                        .role(msg.getRole())
-                        .build())
-                .collect(Collectors.toList());
-    }
-
-    public List<String> getAllSessions() {
-        User currentUser = getCurrentUser();
-        return chatMessageRepository.findDistinctSessionIdByUser(currentUser);
+        return chatMessageMapper.findDistinctSessionIdByUserId(user.getId());
     }
 
     @Transactional
-    public void deleteSession(String sessionId) {
-        User currentUser = getCurrentUser();
-        chatMessageRepository.deleteBySessionIdAndUser(sessionId, currentUser);
-    }
-
-    private String cleanMessage(String message) {
-        if (message == null) {
-            return "";
+    public void deleteChatSession(String sessionId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        User user = userMapper.findByUsername(authentication.getName());
+        if (user == null) {
+            throw new RuntimeException("User not found");
         }
-        // 去除前后的空白字符和特殊转义符
-        return message.trim()
-                .replaceAll("^[\\n\\t\\r]+|[\\n\\t\\r]+$", "") // 去除前后的换行、制表符
-                .replaceAll("\\s+", " "); // 将中间的多个空白字符替换为单个空格
-    }
-
-    public void processMessageStream(String sessionId, String message, String modelId, SseEmitter emitter) {
-        try {
-            // 获取或创建会话ID
-            String currentSessionId = getOrCreateSessionId(sessionId);
-            String currentModelId = modelId != null ? modelId : "qwen3";
-
-            // 保存用户消息
-            saveUserMessage(message, currentSessionId, getCurrentUser());
-
-            // 构建消息上下文
-            List<Message> messages = buildMessageContext(currentSessionId);
-
-            // 获取模型配置
-            ModelProperties.ModelOption modelOptions = modelProperties.getOptions().get(currentModelId);
-            if (modelOptions == null) {
-                throw new IllegalArgumentException("Invalid model ID: " + currentModelId);
-            }
-
-            ChatOptions options = ChatOptions.builder()
-                    .model(modelOptions.getModel())
-                    .temperature(modelOptions.getTemperature())
-                    .topP(modelOptions.getTopP())
-                    .topK(modelOptions.getTopK())
-                    .build();
-
-            // 发送流式响应
-            String response = chatClient.prompt()
-                    .messages(messages)
-                    .options(options)
-                    .call()
-                    .content();
-
-            // 将响应分块发送
-            // 每次发送一个字符，模拟流式效果
-            for (char c : response.toCharArray()) {
-                try {
-                    emitter.send(SseEmitter.event()
-                            .name("message")
-                            .data(String.valueOf(c)));
-                    Thread.sleep(10); // 添加小延迟使流式效果更明显
-                } catch (IOException | InterruptedException e) {
-                    try {
-                        emitter.send(SseEmitter.event()
-                                .name("error")
-                                .data(e.getMessage()));
-                    } catch (IOException ex) {
-                        // 忽略发送错误消息时的异常
-                    }
-                }
-            }
-
-            // 保存完整的助手回复
-            saveAssistantMessage(response, currentSessionId, getCurrentUser());
-
-            // 完成流式响应
-            emitter.send(SseEmitter.event()
-                    .name("done")
-                    .data("[DONE]"));
-            emitter.complete();
-
-        } catch (Exception e) {
-            try {
-                emitter.send(SseEmitter.event()
-                        .name("error")
-                        .data(e.getMessage()));
-            } catch (IOException ex) {
-                // 忽略发送错误消息时的异常
-            }
-        }
+        chatMessageMapper.deleteBySessionIdAndUserId(sessionId, user.getId());
     }
 } 
